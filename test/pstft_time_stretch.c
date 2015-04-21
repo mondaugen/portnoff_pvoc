@@ -22,7 +22,7 @@ int main(int argc, char **argv)
                 "a - The speed factor: a < 1 slower, a > 1 faster\n");
         return(-1);
     }
-    int N, P, H, Ha, n = 0, m = 0, k, done;
+    int N, P, H, Ha, n, m, k, done;
     fftw_complex *X_n, *X_n_H, *Y_n;
     double *x, *h, a;
     N = atoi(argv[1]);
@@ -31,6 +31,8 @@ int main(int argc, char **argv)
     a = atof(argv[4]);
     Ha = (int)(((double)H)*a);
     fftw_plan pf;
+    n = 0; /* index of "current" analysis frame */
+    m = -H; /* index of analysis frame H samples ago */
     X_n = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
     X_n_H = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
     Y_n = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
@@ -67,7 +69,7 @@ int main(int argc, char **argv)
         fftw_execute_dft(pf,X_n_H,X_n_H);
         /* Calculate new Y_n */
         for (k = 0; k < N; k++) {
-            Y_n[k] = Y_n[k]*(X_n[k]/X_n_H[k])*(cabs(X_n_H[k])/cabs(Y_n[k]));
+            Y_n[k] = X_n[k]*(Y_n[k]/X_n_H[k])/cabs(Y_n[k]/X_n_H[k]);
         }
         if (output(Y_n,N)) {
             fprintf(stderr,"Error writing file.\n");
