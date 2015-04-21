@@ -11,7 +11,6 @@
 static int input(double *x, int H);
 static int output(fftw_complex *X, int N);
 static void hann_windowed_sinc_(double *x, int N, int R);
-static void write_hann_windowed_sinc(double *x, int N, char *name);
 
 int main(int argc, char **argv)
 {
@@ -33,11 +32,7 @@ int main(int argc, char **argv)
     X_n = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
     x = (double*)malloc(sizeof(double)*(2*P*N+1));
     h = (double*)malloc(sizeof(double)*(2*P*N+1));
-    h2 = (double*)malloc(sizeof(double)*(2*P*N+1));
-    hann_windowed_sinc_(&h[P*N],P*N,N);
-    hann_windowed_sinc(&h2[P*N],P*N,N);
-    write_hann_windowed_sinc(h,2*P*N+1,"WTF_better.raw");
-    write_hann_windowed_sinc(h2,2*P*N+1,"WTF_worse.raw");
+    hann_windowed_sinc(&h[P*N],P*N,N);
     memset(x,0,sizeof(double)*(2*P*N+1));
     pf = fftw_plan_dft_1d(N,X_n,X_n,FFTW_FORWARD,FFTW_ESTIMATE);
     done = 0;
@@ -64,7 +59,6 @@ int main(int argc, char **argv)
     fftw_free(X_n);
     free(x);
     free(h);
-    free(h2);
     return(0);
 }
     
@@ -99,33 +93,4 @@ int output(fftw_complex *X, int N)
         return -1;
     }
     return 0;
-}
-
-/* calculates a window of length 2*N+1 that is 0 every R samples. x is the address
- * of the centre of the space allocated to store the window */
-static void hann_windowed_sinc_(double *x, int N, int R)
-{
-    double w[2*N+1];
-    /* The commented out configuration sounds worse when invoking:
-     * sox -n -t f64 -c 1 -r 44100 - synth 10 sine 400-1000 | \
-     * ./pstft_analy_test.elf 512 4 128 | \
-     * ./pstft_synth_test.elf 512 128 4 | \
-     * sox -t f64 -c 1 -r 44100 - -d
-     * WTF? */
-//    double *w;
-//    w = (double*)malloc(sizeof(double)*(2*N+1));
-    int n;
-    wc_hann(&w[N],N);
-    wc_sinc(x,N,R);
-    for (n = -N; n <= N; n++) {
-        x[n] *= w[n+N];
-    }
-//    free(w);
-}
-
-static void write_hann_windowed_sinc(double *x, int N, char *name)
-{
-    FILE *f = fopen(name,"w");
-    fwrite(x,sizeof(double),N,f);
-    fclose(f);
 }

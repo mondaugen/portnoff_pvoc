@@ -40,7 +40,7 @@ int main(int argc, char **argv)
     hann_windowed_sinc(&h[P*N],P*N,N);
     memset(x,0,sizeof(double)*(2*P*N+H+1));
     /* Initialize Y_n with small values */
-    for (k = 0; k < N; n++) {
+    for (k = 0; k < N; k++) {
         Y_n[k] = 0.00001;
     }
     pf = fftw_plan_dft_1d(N,X_n,X_n,FFTW_FORWARD,FFTW_ESTIMATE);

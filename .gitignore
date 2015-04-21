@@ -1,2 +1,4 @@
 test/bin
 test/data
+test/objs
+*.o
