@@ -10,61 +10,75 @@
 
 static int input(double *x, int H);
 static int output(fftw_complex *X, int N);
-static void hann_windowed_sinc_(double *x, int N, int R);
-static void write_hann_windowed_sinc(double *x, int N, char *name);
 
 int main(int argc, char **argv)
 {
-    if (argc != 4) {
+    if (argc != 5) {
         fprintf(stderr,
                 "arguments are:\n"
                 "N - The FFT size\n"
                 "P - The window size factor. Window size is 2*P*N + 1\n"
-                "H - The hop size.\n");
+                "H - The hop size.\n"
+                "a - The speed factor: a < 1 slower, a > 1 faster\n");
         return(-1);
     }
-    int N, P, H, n = 0, done;
-    fftw_complex *X_n;
-    double *x, *h, *h2;
+    int N, P, H, Ha, n = 0, m = 0, k, done;
+    fftw_complex *X_n, *X_n_H, *Y_n;
+    double *x, *h, a;
     N = atoi(argv[1]);
     P = atoi(argv[2]);
     H = atoi(argv[3]);
+    a = atof(argv[4]);
+    Ha = (int)(((double)H)*a);
     fftw_plan pf;
     X_n = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
-    x = (double*)malloc(sizeof(double)*(2*P*N+1));
+    X_n_H = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
+    Y_n = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
+    /* Allocate enough buffer space for two analyses separated by a hop */
+    x = (double*)malloc(sizeof(double)*(2*P*N+H+1));
     h = (double*)malloc(sizeof(double)*(2*P*N+1));
-    h2 = (double*)malloc(sizeof(double)*(2*P*N+1));
-    hann_windowed_sinc_(&h[P*N],P*N,N);
-    hann_windowed_sinc(&h2[P*N],P*N,N);
-    write_hann_windowed_sinc(h,2*P*N+1,"WTF_better.raw");
-    write_hann_windowed_sinc(h2,2*P*N+1,"WTF_worse.raw");
-    memset(x,0,sizeof(double)*(2*P*N+1));
+    hann_windowed_sinc(&h[P*N],P*N,N);
+    memset(x,0,sizeof(double)*(2*P*N+H+1));
+    /* Initialize Y_n with small values */
+    for (k = 0; k < N; n++) {
+        Y_n[k] = 0.00001;
+    }
     pf = fftw_plan_dft_1d(N,X_n,X_n,FFTW_FORWARD,FFTW_ESTIMATE);
     done = 0;
     while (!done) {
-        int k;
         memset(X_n,0,sizeof(fftw_complex)*N);
+        memset(X_n_H,0,sizeof(fftw_complex)*N);
         /* Shift-in new values */
-        for (k = 0; k < (2*P*N+1-H); k++) {
-            x[k] = x[k+H];
+        for (k = 0; k < (2*P*N+1-Ha); k++) {
+            x[k] = x[k+Ha];
         }
         /* if input fails, set values to 0 and set done to 1 */
-        done = input(&x[k],H);
+        done = input(&x[k],Ha);
         if (done == -1) {
             fprintf(stderr,"Error reading file.\n");
         }
-        portnoff_analysis_stream(X_n,x+P*N,h+P*N,&n,N,P);
+        /* Analyse most current block */
+        portnoff_analysis_stream(X_n,x+P*N+H,h+P*N,&n,N,P);
         n = (n+H)%N;
-        fftw_execute(pf);
-        if (output(X_n,N)) {
+        /* Analyse block H samples ago */
+        portnoff_analysis_stream(X_n_H,x+P*N,h+P*N,&m,N,P);
+        m = (m+H)%N;
+        fftw_execute_dft(pf,X_n,X_n);
+        fftw_execute_dft(pf,X_n_H,X_n_H);
+        /* Calculate new Y_n */
+        for (k = 0; k < N; k++) {
+            Y_n[k] = Y_n[k]*(X_n[k]/X_n_H[k])*(cabs(X_n_H[k])/cabs(Y_n[k]));
+        }
+        if (output(Y_n,N)) {
             fprintf(stderr,"Error writing file.\n");
         }
     }
     fftw_destroy_plan(pf);
     fftw_free(X_n);
+    fftw_free(X_n_H);
+    fftw_free(Y_n);
     free(x);
     free(h);
-    free(h2);
     return(0);
 }
     
@@ -99,33 +113,4 @@ int output(fftw_complex *X, int N)
         return -1;
     }
     return 0;
-}
-
-/* calculates a window of length 2*N+1 that is 0 every R samples. x is the address
- * of the centre of the space allocated to store the window */
-static void hann_windowed_sinc_(double *x, int N, int R)
-{
-    double w[2*N+1];
-    /* The commented out configuration sounds worse when invoking:
-     * sox -n -t f64 -c 1 -r 44100 - synth 10 sine 400-1000 | \
-     * ./pstft_analy_test.elf 512 4 128 | \
-     * ./pstft_synth_test.elf 512 128 4 | \
-     * sox -t f64 -c 1 -r 44100 - -d
-     * WTF? */
-//    double *w;
-//    w = (double*)malloc(sizeof(double)*(2*N+1));
-    int n;
-    wc_hann(&w[N],N);
-    wc_sinc(x,N,R);
-    for (n = -N; n <= N; n++) {
-        x[n] *= w[n+N];
-    }
-//    free(w);
-}
-
-static void write_hann_windowed_sinc(double *x, int N, char *name)
-{
-    FILE *f = fopen(name,"w");
-    fwrite(x,sizeof(double),N,f);
-    fclose(f);
 }
