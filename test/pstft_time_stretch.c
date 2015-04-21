@@ -69,6 +69,9 @@ int main(int argc, char **argv)
         fftw_execute_dft(pf,X_n_H,X_n_H);
         /* Calculate new Y_n */
         for (k = 0; k < N; k++) {
+            /* avoid divide by 0 */
+            X_n[k] += 10E-6;
+            X_n_H[k] += 10E-6;
             Y_n[k] = X_n[k]*(Y_n[k]/X_n_H[k])/cabs(Y_n[k]/X_n_H[k]);
         }
         if (output(Y_n,N)) {
