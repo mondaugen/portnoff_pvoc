@@ -20,7 +20,7 @@ int main(int argc, char **argv)
                 "The algorithm will use 2*Q spectra.");
         return(-1);
     }
-    int N, R, Q, n, k, done;
+    int N, R, Q, n, k, rem, r_reads, exit_code = 0;
     double *x, *f;
     fftw_complex *s_queue[2*Q];
     fftw_plan pb;
@@ -39,19 +39,38 @@ int main(int argc, char **argv)
     }
     pb = fftw_plan_dft_1d(N,s_queue[2*Q-1],s_queue[2*Q-1],
             FFTW_BACKWARD,FFTW_ESTIMATE);
-    done = 0;
-    while (!done) {
+    /* r_reads is -1 until the end of the input file is reached, then at the end
+     * it is set to the number of remaining reads */
+    r_reads = -1; 
+    rem = 0;
+    while (r_reads) {
         /* shift the spectrum queue */
-        int l;
+        int l, k;
         fftw_complex *tmp;
         tmp = s_queue[0];
         for (l = 0; l < 2*Q-1; l++) {
             s_queue[l] = s_queue[l+1];
         }
         s_queue[l] = tmp;
-        done = input(s_queue[l],N);
-        if (done == -1) {
-            fprintf(stderr,"Error reading file.\n");
+        if (r_reads < 0) {
+            rem = input(s_queue[l],N);
+            if (rem == -1) {
+                fprintf(stderr,"Error reading file.\n");
+                exit_code = -1;
+                goto cleanup;
+            }
+            if (rem > 0) {
+                /* We have reached the end of the input file. This is how many
+                 * additional reads we want to make before the true end */
+                r_reads = 2*Q;
+            }
+        } else {
+            r_reads--;
+            rem = N;
+        }
+        /* Read in the missing samples as just 0. */
+        for (k = N-rem; k < N; k++) {
+            s_queue[l][k] = 0.;
         }
         /* make time-domain signal */
         fftw_execute_dft(pb,s_queue[l],s_queue[l]);
@@ -65,40 +84,36 @@ int main(int argc, char **argv)
         portnoff_synth_stream(x,&s_queue[Q-1],&f[Q*R],&n,N,R,Q);
         if (output(x,R)) {
             fprintf(stderr,"Error writing file.\n");
+            exit_code = -1;
+            goto cleanup;
         }
     }
+cleanup:
     fftw_destroy_plan(pb);
     for (k = 0; k < 2*Q; k++) {
         fftw_free(s_queue[k]);
     }
     free(x);
     free(f);
-    return(0);
+    return(exit_code);
 }
 
 int input(fftw_complex *s, int N)
 {
-    int k, result = 0;
+    int k;
     k = 0;
     while (k < N) {
         if (fread(s,sizeof(fftw_complex),1,stdin) != 1) {
             if (feof(stdin)) {
-                result = 1;
+                return N - k;
             } else {
-                result = -1; /* error occured */
+                return -1; /* error occured */
             }
-            break;
         }
         s++;
         k++;
     }
-    /* fill the rest with 0 */
-    while (k < N) {
-        *s = 0.;
-        s++;
-        k++;
-    }
-    return result;
+    return 0;
 }
 
 int output(double *x, int R)
