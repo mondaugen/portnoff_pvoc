@@ -17,27 +17,31 @@ int main(int argc, char **argv)
                 "N is the FFT-size of the spectra you are reading in\n"
                 "R is the hop-size or interpolation factor\n"
                 "Q is a measure of how many spectra to use."
-                "The algorithm will use 2*Q spectra.");
+                "The algorithm will use ceil(2*Q) spectra and window\n"
+                "with an interpolating window of length 2*Q*R+1.\n"
+                "Q need not be an integer");
         return(-1);
     }
-    int N, R, Q, n, k, rem, r_reads, exit_code = 0;
-    double *x, *f;
-    fftw_complex *s_queue[2*Q];
+    int N, R, n, k, rem, r_reads, exit_code = 0, Ns, L_f;
+    double *x, *f, Q;
     fftw_plan pb;
     N = atoi(argv[1]);
     R = atoi(argv[2]);
-    Q = atoi(argv[3]);
+    Q = atof(argv[3]);
+    Ns = ceil(2*Q);
+    L_f = 2*Q*R+1;
     n = 0;
+    fftw_complex *s_queue[Ns];
     x = (double*)malloc(sizeof(double)*R);
-    f = (double*)malloc(sizeof(double)*(2*Q*R+1));
+    f = (double*)malloc(sizeof(double)*(L_f));
     /* Initialize window */
-    hann_windowed_sinc(&f[Q*R],Q*R,R);
+    hann_windowed_sinc(&f[L_f/2],L_f/2,R);
     /* Initialize queue of spectra to spectra containing 0s */
-    for (k = 0; k < 2*Q; k++) {
+    for (k = 0; k < Ns; k++) {
         s_queue[k] = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
         memset(s_queue[k],0,sizeof(fftw_complex)*N);
     }
-    pb = fftw_plan_dft_1d(N,s_queue[2*Q-1],s_queue[2*Q-1],
+    pb = fftw_plan_dft_1d(N,s_queue[Ns-1],s_queue[Ns-1],
             FFTW_BACKWARD,FFTW_ESTIMATE);
     /* r_reads is -1 until the end of the input file is reached, then at the end
      * it is set to the number of remaining reads */
@@ -48,7 +52,7 @@ int main(int argc, char **argv)
         int l, k;
         fftw_complex *tmp;
         tmp = s_queue[0];
-        for (l = 0; l < 2*Q-1; l++) {
+        for (l = 0; l < Ns-1; l++) {
             s_queue[l] = s_queue[l+1];
         }
         s_queue[l] = tmp;
@@ -62,7 +66,7 @@ int main(int argc, char **argv)
             if (rem > 0) {
                 /* We have reached the end of the input file. This is how many
                  * additional reads we want to make before the true end */
-                r_reads = 2*Q;
+                r_reads = Ns;
             }
         } else {
             r_reads--;
@@ -81,7 +85,7 @@ int main(int argc, char **argv)
         }
         /* set output buffer to 0 */
         memset(x,0,sizeof(double)*R);
-        portnoff_synth_stream(x,&s_queue[Q-1],&f[Q*R],&n,N,R,Q);
+        portnoff_synth_stream(x,&s_queue[Ns/2-1],&f[L_f/2],&n,N,R,Q);
         if (output(x,R)) {
             fprintf(stderr,"Error writing file.\n");
             exit_code = -1;
@@ -90,7 +94,7 @@ int main(int argc, char **argv)
     }
 cleanup:
     fftw_destroy_plan(pb);
-    for (k = 0; k < 2*Q; k++) {
+    for (k = 0; k < Ns; k++) {
         fftw_free(s_queue[k]);
     }
     free(x);

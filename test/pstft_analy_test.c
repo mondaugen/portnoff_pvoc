@@ -22,25 +22,27 @@ int main(int argc, char **argv)
                 "H - The hop size.\n");
         return(-1);
     }
-    int N, P, H, H_cur, H_first, n = 0, r_hops, exit_code = 0, L_win;
+    int N, H, PN, H_cur, H_first, n = 0, r_hops, exit_code = 0, L_win;
+    double P; 
     fftw_complex *X_n;
     double *x, *h, *h2;
     N = atoi(argv[1]);
-    P = atoi(argv[2]);
+    P = atof(argv[2]);
     H = atoi(argv[3]);
-    L_win = 2*P*N+1;
+    PN = P*N;
+    L_win = 2*PN+1;
     fftw_plan pf;
     X_n = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
     x = (double*)malloc(sizeof(double)*(L_win));
     h = (double*)malloc(sizeof(double)*(L_win));
-    hann_windowed_sinc(&h[P*N],P*N,N);
+    hann_windowed_sinc(&h[PN],PN,N);
     memset(x,0,sizeof(double)*(L_win));
     pf = fftw_plan_dft_1d(N,X_n,X_n,FFTW_FORWARD,FFTW_ESTIMATE);
     r_hops = -1; /* the number of remaining hops, always -1 until the end */
     /* The first time we read in values, we want to read in enough so that the
      * centre of the buffer is aligned with the first sample of the input sound
      * file */
-    H_first = P*N + 1;
+    H_first = PN + 1;
     H_cur = H_first;
     while (r_hops) {
         int k, rem;
@@ -66,7 +68,7 @@ int main(int argc, char **argv)
                 /* We have reached the end of the input file. This is how many
                  * additional hops we will do in order to get just past the last
                  * sample of the input file. */
-                r_hops = (P*N+1)/H;
+                r_hops = (PN+1)/H;
             }
         } else {
             r_hops--;
@@ -76,7 +78,7 @@ int main(int argc, char **argv)
         for (k = L_win-rem; k < L_win; k++) {
             x[k] = 0.;
         }
-        portnoff_analysis_stream(X_n,x+P*N,h+P*N,&n,N,P);
+        portnoff_analysis_stream(X_n,x+PN,h+PN,&n,N,P);
         n = (n+H)%N;
         fftw_execute(pf);
         if (output(X_n,N)) {
