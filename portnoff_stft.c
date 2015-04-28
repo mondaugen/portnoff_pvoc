@@ -11,7 +11,7 @@
  * N, R and Q are the values as described above.
  */
 void portnoff_synth_stream(double *x, 
-        complex **s, double *f, int *n, int N, int R, int Q)
+        complex **s, double *f, int *n, int N, int R, double Q)
 {
     int Lmin, Lmax, count;
     Lmin = -Q + 1;
@@ -39,7 +39,7 @@ void portnoff_synth_stream(double *x,
  * N, P are as described above.
  */
 void portnoff_analysis_stream(complex *x_n,
-        double *x, double *h, int *n, int N, int P)
+        double *x, double *h, int *n, int N, double P)
 {
     int m, l;
     for (m = 0; m < N; m++) {
