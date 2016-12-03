@@ -11,11 +11,11 @@ then
 fi
 if [[ -z $3 ]]
 then
-    echo "give original speed as 3rd argument"
+    echo "give additional arguments to sox as 3rd argument"
     exit 65
 fi
 mkfifo /tmp/fifo.$$
-sox $1 -t f64 -c 1 -r 44100 - speed $3 | \
+sox $1 -t f64 -c 1 -r 44100 - $3 | \
     bin/pstft_time_stretch 2048 4 512 $2 > /tmp/fifo.$$&
 echo "$!" > /tmp/tsproc;
 cat /tmp/fifo.$$ | bin/pstft_synth_test 2048 512 4 | \
