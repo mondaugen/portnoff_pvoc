@@ -22,11 +22,11 @@ int main(int argc, char **argv)
     }
     int N, R, Q, n, k, done;
     double *x, *f;
-    fftw_complex *s_queue[2*Q];
     fftw_plan pb;
     N = atoi(argv[1]);
     R = atoi(argv[2]);
     Q = atoi(argv[3]);
+    fftw_complex *s_queue[2*Q];
     n = 0;
     x = (double*)malloc(sizeof(double)*R);
     f = (double*)malloc(sizeof(double)*(2*Q*R+1));

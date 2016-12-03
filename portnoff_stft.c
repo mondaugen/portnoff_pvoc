@@ -2,7 +2,7 @@
 
 /* x is the destination to which the output will be written. x[k] must be
  * defined for 0 <= k < R.
- * s contains 2*Q pointers to arrays of complex values of length N. If s_ is the
+ * s contains 2*Q pointers to arrays of complex double values of length N. If s_ is the
  * beginning of the space allocated to store the 2*Q pointers then &s_[Q-1]
  * should be passed to the function as it uses negative indexing.
  * f is a 1:R interpolating window of length 2*Q*R + 1. Pass a pointer to f_[QR]
@@ -11,7 +11,7 @@
  * N, R and Q are the values as described above.
  */
 void portnoff_synth_stream(double *x, 
-        complex **s, double *f, int *n, int N, int R, int Q)
+        complex double **s, double *f, int *n, int N, int R, int Q)
 {
     int Lmin, Lmax, count;
     Lmin = -Q + 1;
@@ -28,7 +28,7 @@ void portnoff_synth_stream(double *x,
     }
 }
 
-/* x_n is an array of complex numbers of length N. Typically this is initialized
+/* x_n is an array of complex double numbers of length N. Typically this is initialized
  * to containing only zeroes.
  * x is the input signal where x[k] is defined for -P*N <= k < P*N
  * h is a pointer to the middle of a window. Typically h(k) = 0 for k = l*N,
@@ -38,7 +38,7 @@ void portnoff_synth_stream(double *x,
  * reduced modulo N, i.e., *n = (*n + H)%N
  * N, P are as described above.
  */
-void portnoff_analysis_stream(complex *x_n,
+void portnoff_analysis_stream(complex double *x_n,
         double *x, double *h, int *n, int N, int P)
 {
     int m, l;

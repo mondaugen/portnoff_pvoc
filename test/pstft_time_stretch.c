@@ -6,10 +6,17 @@
 #include "portnoff_stft.h"
 #include "window_calc.h" 
 #include <math.h> 
+#include <signal.h> 
 
+static volatile int Ha;
+static int maxHa;
+static int H;
+static double a;
 
 static int input(double *x, int H);
 static int output(fftw_complex *X, int N);
+static void sig_slowdown(int signum);
+static void sig_speedup(int signum);
 
 int main(int argc, char **argv)
 {
@@ -19,25 +26,29 @@ int main(int argc, char **argv)
                 "N - The FFT size\n"
                 "P - The window size factor. Window size is 2*P*N + 1\n"
                 "H - The hop size.\n"
-                "a - The speed factor: a < 1 slower, a > 1 faster\n");
+                "a - The speed factor: a < 1 slower, a > 1 faster\n"
+                "After, the speed can be set anywhere between 0 and 1 using SIGUSR1 and SIGUSR2. SIGUSR1 slows by 5%% of maximum and SIGUSR2 speeds up by 5%%.\n");
         return(-1);
     }
-    int N, P, H, Ha, n, m, k, done;
+    int N, P, n, m, k, done;
     fftw_complex *X_n, *X_n_H, *Y_n;
-    double *x, *h, a;
+    double *x, *h;
     N = atoi(argv[1]);
     P = atoi(argv[2]);
     H = atoi(argv[3]);
     a = atof(argv[4]);
-    Ha = (int)(((double)H)*a);
+    maxHa = (int)(((double)H)*a);
+    Ha = maxHa;
     fftw_plan pf;
     n = 0; /* index of "current" analysis frame */
     m = -H; /* index of analysis frame H samples ago */
     X_n = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
     X_n_H = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
     Y_n = (fftw_complex*)fftw_malloc(sizeof(fftw_complex)*N);
-    /* Allocate enough buffer space for two analyses separated by a hop */
-    x = (double*)malloc(sizeof(double)*(2*P*N+H+1));
+    /* Allocate enough buffer space for two analyses separated by a hop, plus
+     * the extra space needed to hop for timestretching (probably you could get
+     * away with less). */
+    x = (double*)malloc(sizeof(double)*(2*P*N+H+1+Ha));
     h = (double*)malloc(sizeof(double)*(2*P*N+1));
     hann_windowed_sinc(&h[P*N],P*N,N);
     memset(x,0,sizeof(double)*(2*P*N+H+1));
@@ -47,6 +58,8 @@ int main(int argc, char **argv)
     }
     pf = fftw_plan_dft_1d(N,X_n,X_n,FFTW_FORWARD,FFTW_ESTIMATE);
     done = 0;
+    signal(SIGUSR1,sig_slowdown);
+    signal(SIGUSR2,sig_speedup);
     while (!done) {
         memset(X_n,0,sizeof(fftw_complex)*N);
         memset(X_n_H,0,sizeof(fftw_complex)*N);
@@ -118,4 +131,20 @@ int output(fftw_complex *X, int N)
         return -1;
     }
     return 0;
+}
+
+void sig_slowdown(int signum)
+{
+    if ((a -= 0.01) < 0) {
+        a = 0;
+    }
+    Ha = (int)(((double)H)*a); 
+}
+
+void sig_speedup(int signum)
+{
+    if ((a += 0.01)*H > maxHa) {
+        a = ((double)maxHa)/H;
+    }
+    Ha = (int)(((double)H)*a); 
 }
